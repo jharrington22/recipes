@@ -1,0 +1,43 @@
+{{define "base"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{.Title}} · Recipes</title>
+  <link rel="stylesheet" href="/static/site.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <div class="left">
+        <a href="/"><strong>🍳 Recipes</strong></a>
+        <a class="badge" href="/recipes?category=breakfast">Breakfast</a>
+        <a class="badge" href="/recipes?category=lunch">Lunch</a>
+        <a class="badge" href="/recipes?category=dinner">Dinner</a>
+        <a class="badge" href="/recipes">All</a>
+      </div>
+      <div class="right">
+        {{if .Authed}}
+          <a href="/favorites">Favorites</a>
+          <a href="/mealplan">Meal plan</a>
+          <form method="post" action="/logout" style="display:inline">
+            <button class="btn" type="submit">Logout</button>
+          </form>
+        {{else}}
+          <a href="/login">Login</a>
+          <a href="/register">Register</a>
+        {{end}}
+      </div>
+    </div>
+
+    <div style="padding-top: 14px;">
+      {{template "content" .}}
+    </div>
+
+    <hr/>
+    <div class="small">Local dev starter · Gin + Postgres + Podman</div>
+  </div>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="row" style="justify-content: space-between;">
+  <div>
+    <h1 style="margin:0;">{{.Recipe.title}}</h1>
+    <div class="small">
+      <span class="badge">{{.Recipe.category}}</span>
+      · {{.Recipe.created_at.Format "Jan 2, 2006"}}
+    </div>
+  </div>
+
+  {{if .Authed}}
+    <form method="post" action="/recipes/{{.Recipe.id}}/favorite">
+      <button class="btn" type="submit">{{if .Recipe.is_favorite}}★ Favorited{{else}}☆ Favorite{{end}}</button>
+    </form>
+  {{end}}
+</div>
+
+<p style="color: var(--muted); line-height: 1.5;">{{.Recipe.description}}</p>
+
+<h3>Ingredients</h3>
+<ul>
+  {{range .Ingredients}}
+    <li>{{.Name}}{{if .Quantity}} — {{.Quantity}}{{end}}{{if .Unit}} {{.Unit}}{{end}}</li>
+  {{end}}
+</ul>
+
+<h3>Instructions</h3>
+<p style="white-space: pre-wrap; line-height: 1.5;">{{.Recipe.instructions}}</p>
+{{end}}
+
+{{define "recipe.html"}}{{template "base" .}}{{end}}

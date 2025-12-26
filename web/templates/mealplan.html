@@ -1,0 +1,51 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Weekly meal plan</h1>
+<div class="row" style="justify-content: space-between;">
+  <div class="small">Week start (Sunday): <strong>{{.WeekStart}}</strong></div>
+  <div class="row">
+    <a class="btn" href="/shopping?week_start={{.WeekStart}}">Shopping list</a>
+  </div>
+</div>
+
+<table style="margin-top: 12px;">
+  <thead>
+    <tr>
+      <th>Day</th>
+      {{range .Slots}}
+        <th style="text-transform: capitalize;">{{.}}</th>
+      {{end}}
+    </tr>
+  </thead>
+  <tbody>
+    {{range $di, $d := .Days}}
+      <tr>
+        <td><strong>{{$d}}</strong></td>
+        {{range $si, $s := $.Slots}}
+          <td>
+            {{with index $.Grid (printf "%d:%s" $di $s)}}
+              <div><a href="/recipes/{{.RecipeSlug}}">{{.RecipeTitle}}</a></div>
+            {{else}}
+              <div class="small">—</div>
+            {{end}}
+
+            <form method="post" action="/mealplan" style="margin-top:8px;">
+              <input type="hidden" name="week_start" value="{{$.WeekStart}}" />
+              <input type="hidden" name="day_of_week" value="{{$di}}" />
+              <input type="hidden" name="slot" value="{{$s}}" />
+              <select name="recipe_id" style="width: 100%; margin-top: 6px;">
+                <option value="">Pick recipe…</option>
+                {{range $.Options}}
+                  <option value="{{.ID}}">{{.Title}}</option>
+                {{end}}
+              </select>
+              <button class="btn" style="margin-top:8px; width:100%;" type="submit">Set</button>
+            </form>
+          </td>
+        {{end}}
+      </tr>
+    {{end}}
+  </tbody>
+</table>
+{{end}}
+
+{{define "mealplan.html"}}{{template "base" .}}{{end}}

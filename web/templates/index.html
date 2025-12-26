@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1 style="margin:0 0 6px 0;">Latest recipes</h1>
+<div class="small">Try the search page for include/exclude ingredients.</div>
+
+<div class="grid">
+  {{range .Items}}
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <span class="badge">{{.Category}}</span>
+        {{if $.Authed}}
+          <form method="post" action="/recipes/{{.ID}}/favorite" style="margin:0">
+            <button class="btn" type="submit">{{if .IsFavorite}}★ Favorited{{else}}☆ Favorite{{end}}</button>
+          </form>
+        {{end}}
+      </div>
+      <h3><a href="/recipes/{{.Slug}}">{{.Title}}</a></h3>
+      <p>{{.Description}}</p>
+      <div class="small" style="margin-top: 10px;">{{.CreatedAt.Format "Jan 2, 2006"}}</div>
+    </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "index.html"}}{{template "base" .}}{{end}}

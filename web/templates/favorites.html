@@ -1,0 +1,19 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Favorites</h1>
+{{if not .Items}}
+  <div class="card">No favorites yet. Browse <a href="/recipes">recipes</a> and add some.</div>
+{{else}}
+  <div class="grid">
+    {{range .Items}}
+      <div class="card">
+        <span class="badge">{{.Category}}</span>
+        <h3><a href="/recipes/{{.Slug}}">{{.Title}}</a></h3>
+        <p>{{.Description}}</p>
+        <div class="small" style="margin-top: 10px;">{{.CreatedAt.Format "Jan 2, 2006"}}</div>
+      </div>
+    {{end}}
+  </div>
+{{end}}
+{{end}}
+
+{{define "favorites.html"}}{{template "base" .}}{{end}}

@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Shopping list</h1>
+<div class="row" style="justify-content: space-between;">
+  <div class="small">For week: <strong>{{.WeekStart}}</strong></div>
+  <a class="btn" href="/mealplan?week_start={{.WeekStart}}">Back to meal plan</a>
+</div>
+
+{{if not .Items}}
+  <div class="card" style="margin-top:12px;">No meals planned for this week yet.</div>
+{{else}}
+  <div class="card" style="margin-top:12px;">
+    <table>
+      <thead><tr><th>Ingredient</th><th>Used in planned meals</th></tr></thead>
+      <tbody>
+        {{range .Items}}
+          <tr><td>{{.Name}}</td><td>{{.Count}}</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+{{end}}
+{{end}}
+
+{{define "shopping.html"}}{{template "base" .}}{{end}}

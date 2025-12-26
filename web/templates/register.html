@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Register</h1>
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+<form method="post" action="/register" class="card" style="max-width: 520px;">
+  <div class="row">
+    <input class="input" type="email" name="email" placeholder="email" required />
+    <input class="input" type="password" name="password" placeholder="password (min 8 chars)" required />
+  </div>
+  <div style="margin-top: 12px;">
+    <button class="btn primary" type="submit">Create account</button>
+    <span class="small" style="margin-left: 10px;">Already have one? <a href="/login">Login</a></span>
+  </div>
+</form>
+{{end}}
+
+{{define "register.html"}}{{template "base" .}}{{end}}

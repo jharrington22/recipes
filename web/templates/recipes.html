@@ -1,0 +1,36 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Recipes</h1>
+
+<form method="get" action="/recipes" class="row">
+  <select name="category">
+    <option value="">All categories</option>
+    <option value="breakfast" {{if eq .Query.category "breakfast"}}selected{{end}}>Breakfast</option>
+    <option value="lunch" {{if eq .Query.category "lunch"}}selected{{end}}>Lunch</option>
+    <option value="dinner" {{if eq .Query.category "dinner"}}selected{{end}}>Dinner</option>
+  </select>
+  <input class="input" name="q" placeholder="Search by name…" value="{{.Query.q}}" />
+  <input class="input" name="include" placeholder="Include ingredients (csv)" value="{{.Query.include}}" />
+  <input class="input" name="exclude" placeholder="Exclude ingredients (csv)" value="{{.Query.exclude}}" />
+  <button class="btn primary" type="submit">Search</button>
+</form>
+
+<div class="grid">
+  {{range .Items}}
+    <div class="card">
+      <div class="row" style="justify-content: space-between;">
+        <span class="badge">{{.Category}}</span>
+        {{if $.Authed}}
+          <form method="post" action="/recipes/{{.ID}}/favorite" style="margin:0">
+            <button class="btn" type="submit">{{if .IsFavorite}}★ Favorited{{else}}☆ Favorite{{end}}</button>
+          </form>
+        {{end}}
+      </div>
+      <h3><a href="/recipes/{{.Slug}}">{{.Title}}</a></h3>
+      <p>{{.Description}}</p>
+      <div class="small" style="margin-top: 10px;">{{.CreatedAt.Format "Jan 2, 2006"}}</div>
+    </div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "recipes.html"}}{{template "base" .}}{{end}}

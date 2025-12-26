@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1 style="margin:0 0 10px 0;">Login</h1>
+{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+<form method="post" action="/login" class="card" style="max-width: 520px;">
+  <div class="row">
+    <input class="input" type="email" name="email" placeholder="email" required />
+    <input class="input" type="password" name="password" placeholder="password" required />
+  </div>
+  <div style="margin-top: 12px;">
+    <button class="btn primary" type="submit">Login</button>
+    <span class="small" style="margin-left: 10px;">No account? <a href="/register">Register</a></span>
+  </div>
+</form>
+{{end}}
+
+{{define "login.html"}}{{template "base" .}}{{end}}
