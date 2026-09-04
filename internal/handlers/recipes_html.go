@@ -104,15 +104,13 @@ func (h *RecipesHTML) Home(c *gin.Context) {
 		return
 	}
 
-	all := h.Recipes.All()
-	limit := 12
-	if limit > len(all) {
-		limit = len(all)
-	}
+	// Recipes are files with no reliable "added" timestamp, so this is an
+	// alphabetical sample rather than a true "latest" feed (see index.html).
+	top := h.Recipes.Filter(recipes.FilterOpts{Limit: 12})
 
 	h.R.Render(c, "index.html", gin.H{
-		"Title":  "Latest recipes",
-		"Items":  toListItems(all[:limit], favs, planned),
+		"Title":  "All recipes",
+		"Items":  toListItems(top, favs, planned),
 		"Authed": authed,
 	})
 }
@@ -183,20 +181,14 @@ func (h *RecipesHTML) Detail(c *gin.Context) {
 	isFav := false
 	inWeek := false
 	if authed {
-		var exists bool
-		err := h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM user_favorites WHERE user_id=$1 AND recipe_slug=$2)`, uid, slug).Scan(&exists)
+		err := h.DB.Pool.QueryRow(ctx, `
+SELECT EXISTS(SELECT 1 FROM user_favorites WHERE user_id=$1 AND recipe_slug=$2),
+       EXISTS(SELECT 1 FROM meal_plans WHERE user_id=$1 AND week_start=$3 AND recipe_slug=$2)
+`, uid, slug, startOfWeek(time.Now())).Scan(&isFav, &inWeek)
 		if err != nil {
 			c.String(500, err.Error())
 			return
 		}
-		isFav = exists
-
-		err = h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM meal_plans WHERE user_id=$1 AND week_start=$2 AND recipe_slug=$3)`, uid, startOfWeek(time.Now()), slug).Scan(&exists)
-		if err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		inWeek = exists
 	}
 
 	h.R.Render(c, "recipe.html", gin.H{
@@ -313,7 +305,7 @@ func (h *RecipesHTML) ToggleWeekPlan(c *gin.Context) {
 		}
 		rows.Close()
 
-		day := 0
+		day := -1
 		for d := 0; d < 7; d++ {
 			if !used[d] {
 				day = d
@@ -321,15 +313,20 @@ func (h *RecipesHTML) ToggleWeekPlan(c *gin.Context) {
 			}
 		}
 
-		_, err = h.DB.Pool.Exec(ctx, `
+		// Every day already has a recipe planned for this slot. Rather than
+		// silently overwriting one of them, leave the plan untouched — the
+		// user can free up a day from the /mealplan grid first.
+		if day != -1 {
+			_, err = h.DB.Pool.Exec(ctx, `
 INSERT INTO meal_plans(user_id, week_start, day_of_week, slot, recipe_slug)
 VALUES ($1,$2,$3,$4,$5)
 ON CONFLICT (user_id, week_start, day_of_week, slot)
 DO UPDATE SET recipe_slug=EXCLUDED.recipe_slug
 `, uid, weekStart, day, slot, slug)
-		if err != nil {
-			c.String(500, err.Error())
-			return
+			if err != nil {
+				c.String(500, err.Error())
+				return
+			}
 		}
 	}
 
