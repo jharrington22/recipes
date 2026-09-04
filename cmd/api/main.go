@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jharrington22/recipes/internal/auth"
@@ -31,7 +32,7 @@ func main() {
 	defer d.Pool.Close()
 
 	// Detect container vs local paths
-	templatesGlob := pickPath("/web/templates/*.html", "web/templates/*.html")
+	templatesGlob := filepath.Join(pickPath("/web/templates", "web/templates"), "*.html")
 	staticDir := pickPath("/web/static", "web/static")
 	migrationsDir := pickPath("/migrations", "migrations")
 	recipesDir := pickPath("/recipes", "recipes")
