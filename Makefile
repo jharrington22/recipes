@@ -1,4 +1,4 @@
-.PHONY: tidy test build run up down logs migrate seed
+.PHONY: tidy test build run up down logs migrate seed validate-recipes
 
 tidy:
 	go mod tidy
@@ -8,6 +8,9 @@ test:
 
 build:
 	go build ./...
+
+validate-recipes:
+	go run ./cmd/validate-recipes
 
 run:
 	DATABASE_URL='postgres://recipes:recipes@localhost:5432/recipes?sslmode=disable' \

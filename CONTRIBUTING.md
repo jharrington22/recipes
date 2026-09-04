@@ -11,8 +11,9 @@ normal GitHub pull request against a `.md` file.
 2. Name the new file `<slug>.md`, where `<slug>` is a lowercase, dash-separated
    version of the title (e.g. `spicy-peanut-noodles.md`).
 3. Fill in the frontmatter and instructions using the format below.
-4. Open a pull request. CI will run the site's recipe loader against your file
-   and fail the build if it doesn't parse — see [Validation](#validation).
+4. Open a pull request. A CI check validates every file in `recipes/` against
+   the schema below and posts specific errors as inline comments on the exact
+   line in your PR if something's wrong — see [Validation](#validation).
 
 ## File format
 
@@ -41,30 +42,48 @@ Instructions are plain Markdown, so `##` headings, numbered steps, and lists
 all work here.
 ```
 
-Field notes:
+## Schema
 
-- **title / slug** — required. `slug` should match the filename (minus `.md`)
-  and must be unique across `recipes/`.
-- **category** — free text. `breakfast`, `lunch`, and `dinner` get their own
-  quick-filter in the nav; anything else (e.g. `dessert`, `drink`, or
-  `uncategorized`) still shows up under "All" and in search.
-- **ingredients** — each entry needs at least `name`. Add `quantity` and
-  `unit` when you can — they're what the shopping-list page sums across a
-  week's planned meals. Keep `quantity` as a plain number (`2`, `1.5`,
-  `1/2`) so it can be added up; use free text like "to taste" only when there
-  really isn't a quantity.
-- **tags** — optional, freeform.
-- **source_url** — optional link back to where the recipe came from.
+Every field the validator checks, and exactly what it requires:
+
+| Field          | Required | Rules |
+|----------------|----------|-------|
+| `title`        | yes      | non-empty, under 200 characters |
+| `slug`         | no       | if given, must be lowercase letters/digits/single-hyphens, **and must match the filename** (minus `.md`); if omitted, the filename is used. Must be unique across `recipes/`. |
+| `category`     | no       | if given, lowercase letters and single hyphens only (e.g. `dinner`, `slow-cooker`). Empty defaults to `uncategorized`. `breakfast`/`lunch`/`dinner` get their own quick-filter in the nav; anything else still shows up under "All" and in search. |
+| `description`  | no       | under 400 characters — keep it a one-line summary, put detail in the instructions |
+| `tags`         | no       | list of freeform strings |
+| `source_url`   | no       | if given, must be a valid `http(s)://` URL |
+| `ingredients`  | yes      | at least one entry; each entry needs a non-empty `name`. Add `quantity` and `unit` when you can — they're what the shopping-list page sums across a week's planned meals. Keep `quantity` as a plain number (`2`, `1.5`, `1/2`) so it can be added up; use free text like "to taste" only when there really isn't a quantity. |
+| instructions (the Markdown body below the closing `---`) | yes | non-empty |
+
+The frontmatter is also checked for **unknown fields** — a typo like `titel:`
+instead of `title:` is a validation error, not a silently-ignored field.
 
 ## Validation
 
-`go test ./internal/recipes/...` loads every file in `recipes/` the same way
-the running site does, and fails on any file that doesn't parse (bad
-frontmatter, missing title/slug, duplicate slug). Run it locally before
-opening a PR:
+A dedicated tool checks every file in `recipes/` against the schema above:
 
 ```bash
-go test ./internal/recipes/...
+make validate-recipes
+# or: go run ./cmd/validate-recipes
 ```
 
-The same check runs in CI on every pull request that touches `recipes/**`.
+Run it locally before opening a PR — it prints one line per problem with the
+exact file, line, and field, e.g.:
+
+```
+spicy-peanut-noodles.md:6: [ingredients] at least one ingredient is required
+```
+
+The same check runs in CI on every pull request (`validate-recipes` job) and
+reports each issue as an inline annotation on the exact line in the PR's
+"Files changed" tab, so you get feedback without needing to read CI logs.
+Once a PR's recipes all validate, CI also compiles them into a `recipes.json`
+artifact attached to the workflow run, if you want to see exactly what your
+recipe compiles to.
+
+`go test ./...` additionally runs a lighter-weight check (`internal/recipes`'s
+own test suite) that loads every recipe the same way the running site does —
+useful as a quick local sanity check, but `validate-recipes` is the
+authoritative, PR-annotated gate.

@@ -20,9 +20,9 @@ import (
 
 // Ingredient is one line of a recipe's ingredient list.
 type Ingredient struct {
-	Name     string `yaml:"name"`
-	Quantity string `yaml:"quantity,omitempty"`
-	Unit     string `yaml:"unit,omitempty"`
+	Name     string `yaml:"name" json:"name"`
+	Quantity string `yaml:"quantity,omitempty" json:"quantity,omitempty"`
+	Unit     string `yaml:"unit,omitempty" json:"unit,omitempty"`
 }
 
 // frontmatter is the YAML block at the top of a recipe file.
@@ -37,17 +37,21 @@ type frontmatter struct {
 }
 
 // Recipe is a fully parsed recipe: frontmatter plus rendered instructions.
+//
+// The json tags define the compiled recipes.json schema emitted by
+// cmd/validate-recipes; InstructionsHTML is deliberately excluded so that
+// artifact stays a rendering-agnostic snapshot of the source Markdown.
 type Recipe struct {
-	Title            string
-	Slug             string
-	Category         string
-	Description      string
-	Tags             []string
-	SourceURL        string
-	Ingredients      []Ingredient
-	Instructions     string // raw markdown body
-	InstructionsHTML template.HTML
-	FileName         string
+	Title            string        `json:"title"`
+	Slug             string        `json:"slug"`
+	Category         string        `json:"category"`
+	Description      string        `json:"description,omitempty"`
+	Tags             []string      `json:"tags,omitempty"`
+	SourceURL        string        `json:"source_url,omitempty"`
+	Ingredients      []Ingredient  `json:"ingredients"`
+	Instructions     string        `json:"instructions"` // raw markdown body
+	InstructionsHTML template.HTML `json:"-"`
+	FileName         string        `json:"-"`
 }
 
 // ParseError describes a single recipe file that failed to load.
