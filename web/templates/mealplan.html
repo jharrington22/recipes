@@ -7,7 +7,8 @@
   </div>
 </div>
 
-<table style="margin-top: 12px;">
+<div class="card" style="margin-top:16px; overflow-x:auto;">
+<table>
   <thead>
     <tr>
       <th>Day</th>
@@ -32,10 +33,10 @@
               <input type="hidden" name="week_start" value="{{$.WeekStart}}" />
               <input type="hidden" name="day_of_week" value="{{$di}}" />
               <input type="hidden" name="slot" value="{{$s}}" />
-              <select name="recipe_id" style="width: 100%; margin-top: 6px;">
+              <select name="recipe_slug" style="width: 100%; margin-top: 6px;">
                 <option value="">Pick recipe…</option>
                 {{range $.Options}}
-                  <option value="{{.ID}}">{{.Title}}</option>
+                  <option value="{{.Slug}}">{{.Title}}</option>
                 {{end}}
               </select>
               <button class="btn" style="margin-top:8px; width:100%;" type="submit">Set</button>
@@ -46,6 +47,7 @@
     {{end}}
   </tbody>
 </table>
+</div>
 {{end}}
 
 {{define "mealplan.html"}}{{template "base" .}}{{end}}

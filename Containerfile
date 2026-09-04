@@ -10,6 +10,7 @@ WORKDIR /
 COPY --from=build /out/api /api
 COPY web /web
 COPY migrations /migrations
+COPY recipes /recipes
 ENV PORT=8080
 EXPOSE 8080
 USER nonroot:nonroot

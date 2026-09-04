@@ -10,70 +10,115 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jharrington22/recipes/internal/auth"
 	"github.com/jharrington22/recipes/internal/db"
+	"github.com/jharrington22/recipes/internal/recipes"
 	"github.com/jharrington22/recipes/internal/search"
 )
 
 type RecipesHTML struct {
-	DB *db.DB
-	R  *TemplateRenderer
+	DB      *db.DB
+	R       *TemplateRenderer
+	Recipes *recipes.Store
 }
 
 type RecipeListItem struct {
-	ID          int64
 	Title       string
 	Slug        string
 	Category    string
 	Description string
-	CreatedAt   time.Time
 	IsFavorite  bool
+	InWeeksPlan bool
+}
+
+// favoriteSlugs returns the set of recipe slugs the given user has favorited.
+// Returns an empty set for anonymous visitors.
+func favoriteSlugs(ctx context.Context, d *db.DB, uid int64, authed bool) (map[string]bool, error) {
+	set := map[string]bool{}
+	if !authed {
+		return set, nil
+	}
+	rows, err := d.Pool.Query(ctx, `SELECT recipe_slug FROM user_favorites WHERE user_id=$1`, uid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		set[slug] = true
+	}
+	return set, nil
+}
+
+// weekPlanSlugs returns the set of recipe slugs already planned for the
+// given user in the given week (any day/slot). Returns an empty set for
+// anonymous visitors.
+func weekPlanSlugs(ctx context.Context, d *db.DB, uid int64, authed bool, weekStart time.Time) (map[string]bool, error) {
+	set := map[string]bool{}
+	if !authed {
+		return set, nil
+	}
+	rows, err := d.Pool.Query(ctx, `SELECT DISTINCT recipe_slug FROM meal_plans WHERE user_id=$1 AND week_start=$2`, uid, weekStart)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		set[slug] = true
+	}
+	return set, nil
+}
+
+func toListItems(rs []*recipes.Recipe, favs, planned map[string]bool) []RecipeListItem {
+	items := make([]RecipeListItem, 0, len(rs))
+	for _, r := range rs {
+		items = append(items, RecipeListItem{
+			Title:       r.Title,
+			Slug:        r.Slug,
+			Category:    r.Category,
+			Description: r.Description,
+			IsFavorite:  favs[r.Slug],
+			InWeeksPlan: planned[r.Slug],
+		})
+	}
+	return items
 }
 
 func (h *RecipesHTML) Home(c *gin.Context) {
-	// Latest recipes
 	ctx := context.Background()
-
 	uid, _, authed := auth.CurrentUser(c)
 
-	rows, err := h.DB.Pool.Query(ctx, `
-SELECT r.id, r.title, r.slug, r.category, COALESCE(r.description,''), r.created_at,
-       CASE WHEN $1::bigint IS NULL THEN false
-            ELSE EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.user_id=$1 AND uf.recipe_id=r.id)
-       END AS is_fav
-FROM recipes r
-ORDER BY r.created_at DESC
-LIMIT 12
-`, func() any {
-		if authed {
-			return uid
-		}
-		return nil
-	}())
+	favs, err := favoriteSlugs(ctx, h.DB, uid, authed)
 	if err != nil {
 		c.String(500, err.Error())
 		return
 	}
-	defer rows.Close()
+	planned, err := weekPlanSlugs(ctx, h.DB, uid, authed, startOfWeek(time.Now()))
+	if err != nil {
+		c.String(500, err.Error())
+		return
+	}
 
-	items := []RecipeListItem{}
-	for rows.Next() {
-		var it RecipeListItem
-		if err := rows.Scan(&it.ID, &it.Title, &it.Slug, &it.Category, &it.Description, &it.CreatedAt, &it.IsFavorite); err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		items = append(items, it)
+	all := h.Recipes.All()
+	limit := 12
+	if limit > len(all) {
+		limit = len(all)
 	}
 
 	h.R.Render(c, "index.html", gin.H{
 		"Title":  "Latest recipes",
-		"Items":  items,
+		"Items":  toListItems(all[:limit], favs, planned),
 		"Authed": authed,
 	})
 }
 
 func (h *RecipesHTML) List(c *gin.Context) {
 	ctx := context.Background()
-
 	uid, _, authed := auth.CurrentUser(c)
 
 	category := strings.ToLower(strings.TrimSpace(c.Query("category")))
@@ -90,88 +135,29 @@ func (h *RecipesHTML) List(c *gin.Context) {
 		offset = 0
 	}
 
-	args := []any{}
-	arg := func(v any) string {
-		args = append(args, v)
-		return "$" + strconv.Itoa(len(args))
-	}
-
-	where := []string{"1=1"}
-
-	if category != "" {
-		where = append(where, "r.category = "+arg(category))
-	}
-	if q != "" {
-		where = append(where, "r.title ILIKE "+arg("%"+q+"%"))
-	}
-
-	includeJoin := ""
-	includeHaving := ""
-	if len(include) > 0 {
-		includeJoin = `
-JOIN recipe_ingredients ri_in ON ri_in.recipe_id = r.id
-JOIN ingredients i_in ON i_in.id = ri_in.ingredient_id
-`
-		where = append(where, "lower(i_in.name) = ANY("+arg(include)+")")
-		includeHaving = "HAVING COUNT(DISTINCT lower(i_in.name)) = " + arg(len(include))
-	}
-
-	excludeClause := ""
-	if len(exclude) > 0 {
-		excludeClause = `
-AND NOT EXISTS (
-  SELECT 1
-  FROM recipe_ingredients ri_ex
-  JOIN ingredients i_ex ON i_ex.id = ri_ex.ingredient_id
-  WHERE ri_ex.recipe_id = r.id
-    AND lower(i_ex.name) = ANY(` + arg(exclude) + `)
-)
-`
-	}
-
-	// user id argument for favorites existence
-	var uidArg string
-	if authed {
-		uidArg = arg(uid)
-	} else {
-		uidArg = "NULL"
-	}
-
-	sql := `
-SELECT r.id, r.title, r.slug, r.category, COALESCE(r.description,''), r.created_at,
-       CASE WHEN ` + uidArg + `::bigint IS NULL THEN false
-            ELSE EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.user_id=` + uidArg + ` AND uf.recipe_id=r.id)
-       END AS is_fav
-FROM recipes r
-` + includeJoin + `
-WHERE ` + strings.Join(where, " AND ") + `
-` + excludeClause + `
-GROUP BY r.id
-` + includeHaving + `
-ORDER BY r.created_at DESC
-LIMIT ` + arg(limit) + ` OFFSET ` + arg(offset) + `
-`
-
-	rows, err := h.DB.Pool.Query(ctx, sql, args...)
+	favs, err := favoriteSlugs(ctx, h.DB, uid, authed)
 	if err != nil {
 		c.String(500, err.Error())
 		return
 	}
-	defer rows.Close()
-
-	items := []RecipeListItem{}
-	for rows.Next() {
-		var it RecipeListItem
-		if err := rows.Scan(&it.ID, &it.Title, &it.Slug, &it.Category, &it.Description, &it.CreatedAt, &it.IsFavorite); err != nil {
-			c.String(500, err.Error())
-			return
-		}
-		items = append(items, it)
+	planned, err := weekPlanSlugs(ctx, h.DB, uid, authed, startOfWeek(time.Now()))
+	if err != nil {
+		c.String(500, err.Error())
+		return
 	}
+
+	matched := h.Recipes.Filter(recipes.FilterOpts{
+		Category: category,
+		Query:    q,
+		Include:  include,
+		Exclude:  exclude,
+		Limit:    limit,
+		Offset:   offset,
+	})
 
 	h.R.Render(c, "recipes.html", gin.H{
 		"Title":  "Recipes",
-		"Items":  items,
+		"Items":  toListItems(matched, favs, planned),
 		"Authed": authed,
 		"Query": gin.H{
 			"category": category,
@@ -188,93 +174,46 @@ func (h *RecipesHTML) Detail(c *gin.Context) {
 
 	uid, _, authed := auth.CurrentUser(c)
 
-	var (
-		rid          int64
-		title        string
-		category     string
-		description  string
-		instructions string
-		createdAt    time.Time
-		isFav        bool
-	)
-
-	err := h.DB.Pool.QueryRow(ctx, `
-SELECT r.id, r.title, r.category, COALESCE(r.description,''), COALESCE(r.instructions,''), r.created_at,
-       CASE WHEN $2::bigint IS NULL THEN false
-            ELSE EXISTS (SELECT 1 FROM user_favorites uf WHERE uf.user_id=$2 AND uf.recipe_id=r.id)
-       END AS is_fav
-FROM recipes r
-WHERE r.slug=$1
-`, slug, func() any {
-		if authed {
-			return uid
-		}
-		return nil
-	}()).Scan(&rid, &title, &category, &description, &instructions, &createdAt, &isFav)
-
-	if err != nil {
+	r, ok := h.Recipes.BySlug(slug)
+	if !ok {
 		c.String(404, "recipe not found")
 		return
 	}
 
-	ingRows, err := h.DB.Pool.Query(ctx, `
-SELECT i.name, ri.quantity, ri.unit
-FROM recipe_ingredients ri
-JOIN ingredients i ON i.id = ri.ingredient_id
-WHERE ri.recipe_id=$1
-ORDER BY i.name
-`, rid)
-	if err != nil {
-		c.String(500, err.Error())
-		return
-	}
-	defer ingRows.Close()
-
-	type Ingredient struct {
-		Name     string
-		Quantity string
-		Unit     string
-	}
-	ings := []Ingredient{}
-	for ingRows.Next() {
-		var name string
-		var qty *string
-		var unit *string
-		if err := ingRows.Scan(&name, &qty, &unit); err != nil {
+	isFav := false
+	inWeek := false
+	if authed {
+		var exists bool
+		err := h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM user_favorites WHERE user_id=$1 AND recipe_slug=$2)`, uid, slug).Scan(&exists)
+		if err != nil {
 			c.String(500, err.Error())
 			return
 		}
-		ings = append(ings, Ingredient{
-			Name: name,
-			Quantity: func() string {
-				if qty == nil {
-					return ""
-				}
-				return *qty
-			}(),
-			Unit: func() string {
-				if unit == nil {
-					return ""
-				}
-				return *unit
-			}(),
-		})
+		isFav = exists
+
+		err = h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM meal_plans WHERE user_id=$1 AND week_start=$2 AND recipe_slug=$3)`, uid, startOfWeek(time.Now()), slug).Scan(&exists)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+		inWeek = exists
 	}
 
 	h.R.Render(c, "recipe.html", gin.H{
-		"Title":  title,
+		"Title":  r.Title,
 		"Authed": authed,
 		"Recipe": gin.H{
-			"id":           rid,
-			"title":        title,
-			"slug":         slug,
-			"category":     category,
-			"description":  description,
-			"instructions": instructions,
-			"created_at":   createdAt,
-			"is_favorite":  isFav,
+			"title":             r.Title,
+			"slug":              r.Slug,
+			"category":          r.Category,
+			"description":       r.Description,
+			"tags":              r.Tags,
+			"source_url":        r.SourceURL,
+			"instructions_html": r.InstructionsHTML,
+			"is_favorite":       isFav,
+			"in_weeks_plan":     inWeek,
 		},
-		"Ingredients": ings,
+		"Ingredients": r.Ingredients,
 	})
 }
 
@@ -284,24 +223,116 @@ func (h *RecipesHTML) ToggleFavorite(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/login")
 		return
 	}
-	ctx := context.Background()
-	recipeID, _ := strconv.ParseInt(c.Param("id"), 10, 64)
-
-	// Toggle: if exists delete else insert
-	_, err := h.DB.Pool.Exec(ctx, `
-WITH existing AS (
-  SELECT 1 FROM user_favorites WHERE user_id=$1 AND recipe_id=$2
-)
-INSERT INTO user_favorites(user_id, recipe_id)
-SELECT $1,$2
-WHERE NOT EXISTS (SELECT 1 FROM existing)
-`, uid, recipeID)
-	if err == nil {
-		// If it already existed, delete it
-		_, _ = h.DB.Pool.Exec(ctx, `DELETE FROM user_favorites WHERE user_id=$1 AND recipe_id=$2`, uid, recipeID)
+	slug := c.Param("slug")
+	if _, exists := h.Recipes.BySlug(slug); !exists {
+		c.String(404, "recipe not found")
+		return
 	}
 
-	// go back
+	ctx := context.Background()
+	var exists bool
+	if err := h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM user_favorites WHERE user_id=$1 AND recipe_slug=$2)`, uid, slug).Scan(&exists); err != nil {
+		c.String(500, err.Error())
+		return
+	}
+	if exists {
+		_, err := h.DB.Pool.Exec(ctx, `DELETE FROM user_favorites WHERE user_id=$1 AND recipe_slug=$2`, uid, slug)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+	} else {
+		_, err := h.DB.Pool.Exec(ctx, `INSERT INTO user_favorites(user_id, recipe_slug) VALUES ($1,$2)`, uid, slug)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+	}
+
+	ref := c.GetHeader("Referer")
+	if ref == "" {
+		ref = "/recipes"
+	}
+	c.Redirect(http.StatusFound, ref)
+}
+
+// ToggleWeekPlan is the one-click "add to this week" / "remove" button on
+// recipe cards. It's a shortcut into the same meal_plans table the
+// day-by-day /mealplan grid uses, so anything added here shows up there too
+// (and feeds the same shopping-list aggregation). Adding auto-picks the
+// first free day for a slot inferred from the recipe's category (falling
+// back to "dinner"); removing clears every day this recipe was planned for
+// this week.
+func (h *RecipesHTML) ToggleWeekPlan(c *gin.Context) {
+	uid, _, ok := auth.CurrentUser(c)
+	if !ok {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+	slug := c.Param("slug")
+	r, exists := h.Recipes.BySlug(slug)
+	if !exists {
+		c.String(404, "recipe not found")
+		return
+	}
+
+	ctx := context.Background()
+	weekStart := startOfWeek(time.Now())
+
+	var alreadyPlanned bool
+	if err := h.DB.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM meal_plans WHERE user_id=$1 AND week_start=$2 AND recipe_slug=$3)`, uid, weekStart, slug).Scan(&alreadyPlanned); err != nil {
+		c.String(500, err.Error())
+		return
+	}
+
+	if alreadyPlanned {
+		if _, err := h.DB.Pool.Exec(ctx, `DELETE FROM meal_plans WHERE user_id=$1 AND week_start=$2 AND recipe_slug=$3`, uid, weekStart, slug); err != nil {
+			c.String(500, err.Error())
+			return
+		}
+	} else {
+		slot := r.Category
+		if slot != "breakfast" && slot != "lunch" && slot != "dinner" {
+			slot = "dinner"
+		}
+
+		rows, err := h.DB.Pool.Query(ctx, `SELECT day_of_week FROM meal_plans WHERE user_id=$1 AND week_start=$2 AND slot=$3`, uid, weekStart, slot)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+		used := map[int]bool{}
+		for rows.Next() {
+			var d int
+			if err := rows.Scan(&d); err != nil {
+				rows.Close()
+				c.String(500, err.Error())
+				return
+			}
+			used[d] = true
+		}
+		rows.Close()
+
+		day := 0
+		for d := 0; d < 7; d++ {
+			if !used[d] {
+				day = d
+				break
+			}
+		}
+
+		_, err = h.DB.Pool.Exec(ctx, `
+INSERT INTO meal_plans(user_id, week_start, day_of_week, slot, recipe_slug)
+VALUES ($1,$2,$3,$4,$5)
+ON CONFLICT (user_id, week_start, day_of_week, slot)
+DO UPDATE SET recipe_slug=EXCLUDED.recipe_slug
+`, uid, weekStart, day, slot, slug)
+		if err != nil {
+			c.String(500, err.Error())
+			return
+		}
+	}
+
 	ref := c.GetHeader("Referer")
 	if ref == "" {
 		ref = "/recipes"

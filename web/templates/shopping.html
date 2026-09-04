@@ -10,10 +10,19 @@
 {{else}}
   <div class="card" style="margin-top:12px;">
     <table>
-      <thead><tr><th>Ingredient</th><th>Used in planned meals</th></tr></thead>
+      <thead><tr><th>Ingredient</th><th>Amount</th></tr></thead>
       <tbody>
         {{range .Items}}
-          <tr><td>{{.Name}}</td><td>{{.Count}}</td></tr>
+          <tr>
+            <td>{{.Name}}</td>
+            <td>
+              {{if .Amounts}}
+                {{range $i, $a := .Amounts}}{{if $i}}, {{end}}{{$a}}{{end}}
+              {{else}}
+                <span class="small">as needed</span>
+              {{end}}
+            </td>
+          </tr>
         {{end}}
       </tbody>
     </table>
