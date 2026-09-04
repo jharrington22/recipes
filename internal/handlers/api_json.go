@@ -8,10 +8,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jharrington22/recipes/internal/auth"
 	"github.com/jharrington22/recipes/internal/db"
+	"github.com/jharrington22/recipes/internal/recipes"
 	"github.com/jharrington22/recipes/internal/search"
 )
 
-type API struct{ DB *db.DB }
+type API struct {
+	DB          *db.DB
+	RecipeStore *recipes.Store
+}
 
 func (a *API) Me(c *gin.Context) {
 	uid, email, _ := auth.CurrentUser(c)
@@ -20,7 +24,7 @@ func (a *API) Me(c *gin.Context) {
 
 func (a *API) Recipes(c *gin.Context) {
 	// Simple JSON list mirrors HTML list endpoint
-	h := &RecipesHTML{DB: a.DB}
+	h := &RecipesHTML{DB: a.DB, Recipes: a.RecipeStore}
 	h.List(c)
 }
 
@@ -41,7 +45,7 @@ func (a *API) MealPlanWeek(c *gin.Context) {
 	}
 	ctx := context.Background()
 	rows, err := a.DB.Pool.Query(ctx, `
-SELECT day_of_week, slot, recipe_id
+SELECT day_of_week, slot, recipe_slug
 FROM meal_plans
 WHERE user_id=$1 AND week_start=$2
 ORDER BY day_of_week, slot
@@ -53,14 +57,14 @@ ORDER BY day_of_week, slot
 	defer rows.Close()
 
 	type Item struct {
-		DayOfWeek int    `json:"day_of_week"`
-		Slot      string `json:"slot"`
-		RecipeID  int64  `json:"recipe_id"`
+		DayOfWeek  int    `json:"day_of_week"`
+		Slot       string `json:"slot"`
+		RecipeSlug string `json:"recipe_slug"`
 	}
 	items := []Item{}
 	for rows.Next() {
 		var it Item
-		if err := rows.Scan(&it.DayOfWeek, &it.Slot, &it.RecipeID); err != nil {
+		if err := rows.Scan(&it.DayOfWeek, &it.Slot, &it.RecipeSlug); err != nil {
 			c.JSON(500, gin.H{"error": err.Error()})
 			return
 		}

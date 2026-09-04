@@ -5,38 +5,46 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{.Title}} · Recipes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/site.css" />
 </head>
 <body>
-  <div class="container">
-    <div class="nav">
+  <div class="nav-wrap">
+    <div class="container nav">
       <div class="left">
-        <a href="/"><strong>🍳 Recipes</strong></a>
-        <a class="badge" href="/recipes?category=breakfast">Breakfast</a>
-        <a class="badge" href="/recipes?category=lunch">Lunch</a>
-        <a class="badge" href="/recipes?category=dinner">Dinner</a>
-        <a class="badge" href="/recipes">All</a>
+        <a class="logo" href="/">🍲 <span>Recipes</span></a>
+        <a class="badge" data-category="breakfast" href="/recipes?category=breakfast">Breakfast</a>
+        <a class="badge" data-category="lunch" href="/recipes?category=lunch">Lunch</a>
+        <a class="badge" data-category="dinner" href="/recipes?category=dinner">Dinner</a>
+        <a class="badge" href="/recipes">All recipes</a>
       </div>
       <div class="right">
         {{if .Authed}}
-          <a href="/favorites">Favorites</a>
-          <a href="/mealplan">Meal plan</a>
+          <a href="/favorites">♡ Favorites</a>
+          <a href="/mealplan">🗓️ Meal plan</a>
+          <a href="/shopping">🛒 Shopping list</a>
           <form method="post" action="/logout" style="display:inline">
             <button class="btn" type="submit">Logout</button>
           </form>
         {{else}}
           <a href="/login">Login</a>
-          <a href="/register">Register</a>
+          <a class="btn primary" href="/register">Get started</a>
         {{end}}
       </div>
     </div>
+  </div>
 
-    <div style="padding-top: 14px;">
+  <div class="container">
+    <div class="page">
       {{template "content" .}}
     </div>
 
-    <hr/>
-    <div class="small">Local dev starter · Gin + Postgres + Podman</div>
+    <div class="footer">
+      <span>🌱 Recipes are open — anyone can add one.</span>
+      <a href="https://github.com/jharrington22/recipes" target="_blank" rel="noopener noreferrer">Contribute on GitHub</a>
+    </div>
   </div>
 </body>
 </html>
