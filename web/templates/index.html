@@ -10,10 +10,10 @@
         {{if $.Authed}}
           <div class="row" style="gap:6px;">
             <form method="post" action="/recipes/{{.Slug}}/favorite" style="margin:0">
-              <button class="btn" type="submit">{{if .IsFavorite}}★ Favorited{{else}}☆ Favorite{{end}}</button>
+              <button class="btn{{if .IsFavorite}} active{{end}}" type="submit">{{if .IsFavorite}}{{template "icon-heart-filled"}}Favorited{{else}}{{template "icon-heart"}}Favorite{{end}}</button>
             </form>
             <form method="post" action="/recipes/{{.Slug}}/plan" style="margin:0">
-              <button class="btn" type="submit">{{if .InWeeksPlan}}✓ In this week{{else}}+ Add to week{{end}}</button>
+              <button class="btn{{if .InWeeksPlan}} active{{end}}" type="submit">{{if .InWeeksPlan}}{{template "icon-check-circle"}}In this week{{else}}{{template "icon-plus-circle"}}Add to week{{end}}</button>
             </form>
           </div>
         {{end}}

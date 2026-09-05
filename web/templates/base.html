@@ -7,14 +7,14 @@
   <title>{{.Title}} · Recipes</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/site.css" />
 </head>
 <body>
   <div class="nav-wrap">
     <div class="container nav">
       <div class="left">
-        <a class="logo" href="/">🍲 <span>Recipes</span></a>
+        <a class="logo" href="/">{{template "icon-leaf"}}<span>Recipes</span></a>
         <a class="badge" data-category="breakfast" href="/recipes?category=breakfast">Breakfast</a>
         <a class="badge" data-category="lunch" href="/recipes?category=lunch">Lunch</a>
         <a class="badge" data-category="dinner" href="/recipes?category=dinner">Dinner</a>
@@ -22,9 +22,9 @@
       </div>
       <div class="right">
         {{if .Authed}}
-          <a href="/favorites">♡ Favorites</a>
-          <a href="/mealplan">🗓️ Meal plan</a>
-          <a href="/shopping">🛒 Shopping list</a>
+          <a href="/favorites">{{template "icon-heart"}}<span>Favorites</span></a>
+          <a href="/mealplan">{{template "icon-calendar"}}<span>Meal plan</span></a>
+          <a href="/shopping">{{template "icon-bag"}}<span>Shopping list</span></a>
           <form method="post" action="/logout" style="display:inline">
             <button class="btn" type="submit">Logout</button>
           </form>
@@ -40,12 +40,30 @@
     <div class="page">
       {{template "content" .}}
     </div>
+  </div>
 
-    <div class="footer">
-      <span>🌱 Recipes are open — anyone can add one.</span>
+  <div class="footer-wrap">
+    <div class="container footer">
+      <span>{{template "icon-leaf"}}Recipes are open — anyone can add one.</span>
       <a href="https://github.com/jharrington22/recipes" target="_blank" rel="noopener noreferrer">Contribute on GitHub</a>
     </div>
   </div>
 </body>
 </html>
 {{end}}
+
+{{/* Small inline icon set (stroke-based, inherits color via currentColor). */}}
+
+{{define "icon-leaf"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 4c-8 0-14 4-16 12-1 4 1 6 4 5C16 19 20 13 20 4Z"/><path d="M5 19c2-4 5-7 9-9"/></svg>{{end}}
+
+{{define "icon-heart"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-10-9.3C.6 8 2 4.5 5.3 3.7c2-.5 4 .3 5.2 2 .3.4.9.4 1.2 0 1.2-1.7 3.2-2.5 5.2-2 3.3.8 4.7 4.3 3.3 7.5-2.5 4.7-10 9.3-10 9.3Z"/></svg>{{end}}
+
+{{define "icon-heart-filled"}}<svg class="icon" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-10-9.3C.6 8 2 4.5 5.3 3.7c2-.5 4 .3 5.2 2 .3.4.9.4 1.2 0 1.2-1.7 3.2-2.5 5.2-2 3.3.8 4.7 4.3 3.3 7.5-2.5 4.7-10 9.3-10 9.3Z"/></svg>{{end}}
+
+{{define "icon-calendar"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17"/><path d="M8 3v4M16 3v4"/></svg>{{end}}
+
+{{define "icon-bag"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 8.5h11l1 11.5a2 2 0 0 1-2 2.2H7.5a2 2 0 0 1-2-2.2l1-11.5Z"/><path d="M9 8.5V7a3 3 0 0 1 6 0v1.5"/></svg>{{end}}
+
+{{define "icon-plus-circle"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>{{end}}
+
+{{define "icon-check-circle"}}<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-5"/></svg>{{end}}
